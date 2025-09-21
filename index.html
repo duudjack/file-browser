@@ -1,12 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>File Browser</title>
+
+  <!-- Pico.css (minimal CSS framework) -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css"
+  />
+
+  <!-- Font Awesome for file icons -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkfQhN3G2ZcQ+7B2szH4mQW+LZqg7Gax4Yh0uZB6YgGZlYh9QJQYxS+Q=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+
+  <style>
+    .status-badge { font-size: 0.9em; margin-left: .4rem; }
+    .ok { color: var(--pico-color-green-500, #2ecc71); }
+    .bad { color: var(--pico-color-red-500, #e74c3c); }
+    td i { font-size: 1.1rem; }
+    /* Optional zebra striping */
+    table.striped tbody tr:nth-child(odd) { background: rgba(0,0,0,.03); }
+  </style>
 </head>
-<body>
-    
+<body class="container">
+
+  <header>
+    <h1>File Browser</h1>
+    <p>This page lists files hosted in the repository root. Click to open.</p>
+  </header>
+
+  <section>
+    <h2>Files</h2>
+    <table class="striped" role="grid" id="files-table">
+      <thead>
+        <tr>
+          <th scope="col">File icon</th>
+          <th scope="col">File link</th>
+          <th scope="col">File type</th>
+          <th scope="col">File size</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Replace the filenames below with your actual files -->
+        <tr data-path="hello world.png" data-type="PNG image">
+          <td title="Image"><i class="fa-solid fa-file-image" aria-hidden="true"></i></td>
+          <td class="file-link">
+            <a href="./hello world.png" target="_blank" rel="noopener">hello world.png</a>
+          </td>
+          <td>PNG image</td>
+          <td class="size">—</td>
+        </tr>
+
+        <tr data-path="base.html" data-type="HTML">
+          <td title="HTML"><i class="fa-solid fa-file-code" aria-hidden="true"></i></td>
+          <td class="file-link">
+            <a href="./base.html" target="_blank" rel="noopener">base.html</a>
+          </td>
+          <td>HTML</td>
+          <td class="size">—</td>
+        </tr>
+
+        <tr data-path="base.json" data-type="JSON">
+          <td title="JSON"><i class="fa-solid fa-code" aria-hidden="true"></i></td>
+          <td class="file-link">
+            <a href="./base.json" target="_blank" rel="noopener">base.json</a>
+          </td>
+          <td>JSON</td>
+          <td class="size">—</td>
+        </tr>
+
+        <tr data-path="plaintext.txt" data-type="Plain text">
+          <td title="Text"><i class="fa-regular fa-file-lines" aria-hidden="true"></i></td>
+          <td class="file-link">
+            <a href="./plaintext.txt" target="_blank" rel="noopener">plaintext.txt</a>
+          </td>
+          <td>Plain text</td>
+          <td class="size">—</td>
+        </tr>
+
+        <tr data-path="Hello World.pdf" data-type="PDF">
+          <td title="PDF"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i></td>
+          <td class="file-link">
+            <a href="./Hello World.pdf" target="_blank" rel="noopener">Hello World.pdf</a>
+          </td>
+          <td>PDF</td>
+          <td class="size">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h3>Browser observations</h3>
+    <p>After you click and test each file, jot down three things you noticed:</p>
+    <ul id="observations">
+      <li>PDF opened in a built-in viewer with its own toolbar (zoom, download) instead of downloading immediately.</li>
+      <li>Image displayed inline in a new tab; the browser showed the image dimensions and allowed right-click save.</li>
+      <li>JSON and TXT rendered as plain text; HTML executed and showed a styled page.</li>
+    </ul>
+    <p><small>Tip: Replace these with your own observations based on your browser/OS.</small></p>
+  </section>
+
+  <script>
+    // Utility: human-readable bytes
+    function prettyBytes(bytes) {
+      if (!Number.isFinite(bytes)) return "—";
+      const units = ["B","KB","MB","GB","TB"];
+      let i = 0;
+      while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+      }
+      return `${bytes.toFixed(bytes < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+    }
+
+    async function checkRow(row) {
+      const a = row.querySelector('.file-link a');
+      const sizeCell = row.querySelector('.size');
+      const badge = document.createElement('span');
+      badge.className = 'status-badge';
+      badge.textContent = '…';
+      a.after(badge);
+
+      try {
+        // HEAD should be enough and faster; fallback to GET if needed
+        let res = await fetch(a.getAttribute('href'), { method: 'HEAD' });
+
+        // Some static hosts may not support HEAD; fallback:
+        if (!res.ok || !res.headers.has('content-length')) {
+          res = await fetch(a.getAttribute('href'), { method: 'GET' });
+        }
+
+        if (res.ok) {
+          badge.textContent = '✅';
+          badge.classList.add('ok');
+          const len = res.headers.get('content-length');
+          if (len) sizeCell.textContent = prettyBytes(parseInt(len, 10));
+        } else {
+          badge.textContent = '❌';
+          badge.classList.add('bad');
+          console.warn('Broken link:', a.getAttribute('href'), res.status, res.statusText);
+        }
+      } catch (err) {
+        badge.textContent = '❌';
+        badge.classList.add('bad');
+        console.error('Error checking link:', a.getAttribute('href'), err);
+      }
+    }
+
+    // Run checks (works best on a real server: Netlify, GitHub Pages, or a local dev server)
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('#files-table tbody tr').forEach(checkRow);
+    });
+  </script>
 </body>
 </html>
